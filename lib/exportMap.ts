@@ -2,8 +2,16 @@ export async function exportMapAsPNG(
   svgEl: SVGSVGElement,
   filename = "life-metro-map.png"
 ): Promise<void> {
-  const serializer = new XMLSerializer();
-  const svgString = serializer.serializeToString(svgEl);
+  const W = svgEl.viewBox.baseVal.width;
+  const H = svgEl.viewBox.baseVal.height;
+
+  // Clone and stamp explicit pixel dimensions so the serialized SVG renders
+  // at the full viewBox size regardless of the element's CSS width/height.
+  const clone = svgEl.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", String(W));
+  clone.setAttribute("height", String(H));
+
+  const svgString = new XMLSerializer().serializeToString(clone);
   const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
 
@@ -15,14 +23,15 @@ export async function exportMapAsPNG(
     img.onerror = reject;
   });
 
-  const canvas = document.createElement("canvas");
   const scale = 2; // retina
-  canvas.width = svgEl.viewBox.baseVal.width * scale;
-  canvas.height = svgEl.viewBox.baseVal.height * scale;
+  const canvas = document.createElement("canvas");
+  canvas.width = W * scale;
+  canvas.height = H * scale;
 
   const ctx = canvas.getContext("2d")!;
   ctx.scale(scale, scale);
-  ctx.drawImage(img, 0, 0);
+  // Draw at the explicit viewBox dimensions, not the img's natural size
+  ctx.drawImage(img, 0, 0, W, H);
   URL.revokeObjectURL(url);
 
   canvas.toBlob((blob) => {
